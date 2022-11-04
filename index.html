@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HashIt</title>
+    <script>
+        /*
+                                                                                    This is free Javascript licensed under the MIT (Expat) License.
+
+                                                                                    Source and documentation:
+                                                                                    https://github.com/saheerahmedsk/SHA-256
+
+                                                                                    @licstart  The following is the entire license notice for the
+                                                                                    JavaScript code in this page.
+
+                                                                                    Copyright (C) 2016 Steffen Prince
+
+                                                                                    Permission is hereby granted, free of charge, to any person
+                                                                                    obtaining a copy of this software and associated documentation
+                                                                                    files (the "Software"), to deal in the Software without
+                                                                                    restriction, including without limitation the rights to use,
+                                                                                    copy, modify, merge, publish, distribute, sublicense, and/or sell
+                                                                                    copies of the Software, and to permit persons to whom the
+                                                                                    Software is furnished to do so, subject to the following
+                                                                                    conditions:
+
+                                                                                    The above copyright notice and this permission notice shall be
+                                                                                    included in all copies or substantial portions of the Software.
+
+                                                                                    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+                                                                                    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+                                                                                    OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+                                                                                    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+                                                                                    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+                                                                                    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+                                                                                    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+                                                                                    OTHER DEALINGS IN THE SOFTWARE.
+
+                                                                                    @licend  The above is the entire license notice
+                                                                                    for the JavaScript code in this page.
+                                                                                    */
+    </script>
+    <style>
+        html {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+        }
+        
+        *,
+        *:before,
+        *:after {
+            box-sizing: inherit;
+        }
+        
+        body {
+            padding-right: 15%;
+            padding-left: 15%;
+        }
+        
+        h1,
+        h2 {
+            margin: 0.8em 0 0.2em 0;
+        }
+        
+        p {
+            font-size: 18px;
+            margin: 0.2em 0 0.2em 0;
+        }
+        
+        #lang-widget {
+            cursor: pointer;
+            margin: 0.8em 0 0.2em 0;
+            font-size: 14px;
+            float: right;
+        }
+        
+        #lang-widget>ul {
+            list-style-type: none;
+            padding: 5px 10px 5px 10px;
+            margin: 0px;
+            display: block;
+        }
+        
+        #lang-widget li {
+            padding: 3px;
+            display: inline;
+        }
+        
+        #lang-widget a {
+            text-decoration: none;
+        }
+        
+        #url {
+            width: 450px;
+            margin: 0.8em 0 0.2em 0;
+        }
+        
+        #drop-area {
+            width: 96%;
+            margin: 0.5em 1em 0.5em 1em;
+            border: solid #000 1px;
+            padding: 2em;
+            text-align: center;
+            font-size: 20px;
+        }
+        
+        #fileinput {
+            margin-left: 75%;
+        }
+        
+        #save-file {
+            visibility: hidden;
+        }
+        
+        [data-tooltip] {
+            border-bottom: 1px dotted #000;
+            color: #000;
+            outline: none;
+            cursor: help;
+            text-decoration: none;
+            position: relative;
+        }
+        
+        [data-tooltip]:after {
+            -webkit-transition: .2s;
+            transition: .2s;
+            opacity: 0;
+            visibility: hidden;
+            top: 2em;
+            display: block;
+            position: absolute;
+            width: 350px;
+            padding: 10px;
+            left: 0px;
+            margin-bottom: 15px;
+            background: #FFF;
+            border: 1px solid #000;
+            text-align: center;
+            content: attr(data-tooltip);
+        }
+        
+        [data-tooltip]:hover:after {
+            opacity: 1;
+            visibility: visible;
+            margin-bottom: 12px;
+        }
+        
+        #noscript-overlay {
+            position: absolute;
+            left: 0px;
+            background: #FFF;
+            width: 100%;
+            height: 100%;
+            z-index: 10000;
+        }
+        
+        #result {
+            height: 8em;
+            margin-top: 1.5em;
+        }
+        
+        footer {
+            padding-bottom: 2px;
+            position: fixed;
+            bottom: 0px;
+            left: 0px;
+            width: 100%;
+            text-align: center;
+            background: #FFF;
+        }
+    </style>
+    <script>
+        // Set up handlers on load.
+        window.addEventListener("load", function() {
+            // Localize the interface.
+            localizeDOM();
+            var langChoices = document.querySelectorAll("[data-lang]");
+            for (choice of langChoices) {
+                choice.addEventListener('click', handleLangClick);
+            }
+
+            // Check if app loaded from local copy, and hide reminder to save if local.
+            checkIfLocalCopy();
+
+            // Compute the hash when a selection is made with the file input
+            var fileinput = document.getElementById('fileinput');
+            fileinput.addEventListener('change', handleFileInputChange);
+
+            // Compute the hash when a file is dropped into the drop area
+            var dropArea = document.getElementById('drop-area');
+            dropArea.addEventListener('dragover', handleDropAreaDragover);
+            dropArea.addEventListener('drop', handleDropAreaDrop);
+
+            // Open the file input prompt when the drop area is clicked
+            dropArea.addEventListener('click', handleDropAreaClick);
+
+            // Fetch the remote resource upon submit, and hash if fetch succeeds.
+            var form = document.getElementById('url-form');
+            form.addEventListener("submit", handleURLSubmit);
+        });
+
+        // Event handlers
+
+        function handleLangClick() {
+            setLang(this.dataset.lang);
+            localizeDOM();
+        }
+
+        function handleFileInputChange() {
+            // Hash a local file when selected via file input.
+            clearResult();
+            var fileinput = this;
+            var file = fileinput.files[0];
+
+            hashFile(file)
+                .then(showHash)
+                .catch(showHashError);
+        }
+
+        function handleDropAreaDragover(evt) {
+            // Set up the drop area.
+            evt.preventDefault();
+            evt.dataTransfer.dropEffect = 'copy';
+        }
+
+        function handleDropAreaDrop(evt) {
+            // Hash the file that is dropped into the drop area.
+            evt.preventDefault();
+            clearResult();
+            var file = evt.dataTransfer.files[0];
+
+            hashFile(file)
+                .then(showHash)
+                .catch(showHashError);
+        }
+
+        function handleDropAreaClick(evt) {
+            // Show the file select dialog.
+            evt.preventDefault();
+            var doc = document.getElementById('fileinput').ownerDocument;
+            var fileinputClick = doc.createEvent('MouseEvents');
+            fileinputClick.initEvent('click', true, true);
+            fileinput.dispatchEvent(fileinputClick, true);
+        }
+
+        function handleURLSubmit(evt) {
+            // Trigger the GET request when submit is clicked in the URL form.
+            evt.preventDefault();
+            clearResult();
+            var saveFile = document.getElementById('save-file');
+            saveFile.style.visibility = 'hidden';
+            var url = document.getElementById('url').value;
+            if (url == '') {
+                return;
+            }
+            var url = normalizeURL(url)
+
+
+            fetchRemoteResource(url)
+                .then(function(xhr) {
+
+                    // Hash response.
+                    crypto.subtle.digest("SHA-256", xhr.response)
+                        .then(showHash)
+                        .catch(showHashError);
+
+                    // Allow response to be saved.
+                    setUpSaveFile(xhr);
+                })
+                .catch(showFetchError);
+        }
+
+        function setUpSaveFile(xhr) {
+            // Set up the Save File.
+            var saveFile = document.getElementById('save-file');
+            saveFile.style.visibility = 'visible';
+            // Unbind previous Save File handler, if any.
+            saveFile.removeEventListener('click', saveFile.handleSaveFileClick);
+
+            // Show the save prompt on click.
+            saveFile.handleSaveFileClick = function() {
+                var filename = filenameFromURL(xhr.responseURL);
+                showSavePrompt(filename, xhr.response);
+            };
+
+            saveFile.addEventListener('click', saveFile.handleSaveFileClick);
+        }
+
+        function checkIfLocalCopy() {
+            // Hide the description, including a recommendation to save if the app
+            // has been loaded from a local file.
+            if (/^file:\/\//.test(window.location.toString())) {
+                document.getElementById('description').style.visibility = 'hidden';
+            }
+        }
+
+        // Utilities
+
+        function bufferToHex(buffer) {
+            // Convert a buffer into a hexadecimal string.
+            // From https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/digest
+            var hexCodes = [];
+            var view = new DataView(buffer);
+
+            for (var i = 0; i < view.byteLength; i += 4) {
+                // Using getUint32 reduces the number of iterations needed (we process
+                // 4 bytes each time).
+                var value = view.getUint32(i);
+                // toString(16) will give the hex representation of the number without
+                // padding
+                var stringValue = value.toString(16);
+                // We use concatenation and slice for padding.
+                var padding = '00000000';
+                var paddedValue = (padding + stringValue).slice(-padding.length);
+                hexCodes.push(paddedValue);
+            }
+
+            return hexCodes.join("");
+        }
+
+        function bufferToBase64(buffer) {
+            // Convert a buffer into a base64 string.
+            var str = '';
+            var bytes = new Uint8Array(buffer);
+            var len = bytes.byteLength;
+
+            for (var i = 0; i < len; i++) {
+                str += String.fromCharCode(bytes[i]);
+            }
+
+            return window.btoa(str);
+        }
+
+        function fetchRemoteResource(url) {
+            // Fetch a URL with a GET request, saving the response as a buffer.
+            // Returns a Promise of a successful XHR.
+            return new Promise(function(resolve, reject) {
+                var xhr = new XMLHttpRequest();
+                xhr.responseType = 'arraybuffer';
+                xhr.addEventListener('load', function() {
+
+                    if (xhr.status == 200) {
+                        resolve(xhr);
+                    } else {
+                        reject(Error('Non-200 Status Code'));
+                    }
+                });
+
+                function onerror(e) {
+                    // Browser may have blocked request due to mixed content
+                    if (
+                        url.substr(0, 7) == 'http://' &&
+                        window.location.toString().substr(0, 8) == 'https://'
+                    ) {
+                        reject(Error('Mixed content blocked'));
+                    } else {
+                        reject(e)
+                    }
+                }
+                xhr.addEventListener('error', onerror)
+                xhr.open('GET', url);
+                // Must wrap call in try/catch because the error event is not correctly
+                // fired in Firefox when mixed-content requests are blocked.
+                try {
+                    xhr.send();
+                } catch (e) {
+                    onerror(e)
+                };
+            });
+        }
+
+        function hashFile(file) {
+            // Hash a File object.
+            // Returns a Promise of a successful hash.
+            return new Promise(function(resolve, reject) {
+                var fileReader = new FileReader();
+                fileReader.addEventListener('load', function() {
+
+                    crypto.subtle.digest("SHA-256", this.result)
+                        .then(resolve)
+                        .catch(reject);
+                });
+                fileReader.readAsArrayBuffer(file);
+            });
+        }
+
+        function filenameFromURL(url) {
+            // Generate a reasonable filename for a given URL.
+            var noprefix = url.replace(/^http:\/\/|^https:\/\//, '');
+            var parts = noprefix.split('/');
+
+            if (parts.length > 1 && parts[parts.length !== '']) {
+                // Use the part of the URL after the last '/'.
+                return parts[parts.length - 1];
+            } else {
+                // Assume that if there is no part after hostname, or no part after
+                // the final '/', then this must be an html file.
+                return noprefix + '.html';
+            }
+        }
+
+        function normalizeURL(url) {
+            // Add http:// protocol if no protocol is supplied.
+            if (!/^http:\/\/|^https:\/\//.test(url)) {
+                return 'http://' + url;
+            }
+            return url;
+        }
+
+        // DOM mutation
+
+        function showHash(hash) {
+            // Display the hash as a hex string.
+            var sha256 = bufferToHex(hash);
+            document.getElementById('result').innerHTML =
+                '<h2>SHA-256 Hash</h2><p>' + sha256;
+        }
+
+        function clearResult() {
+            document.getElementById('result').innerHTML = '';
+        }
+
+        function showHashError(err) {
+            // Display a generic hash error.
+            document.getElementById('result').innerHTML =
+                '<h2>' + gettext('error-header') + '</h2>' +
+                '<p>' + gettext('error-hash');
+        }
+
+        function showFetchError(e) {
+            var url = normalizeURL(document.getElementById('url').value);
+            var errorMsg;
+
+            if (e.message == 'Mixed content blocked') {
+                // Display a message specific to mixed content errors.
+                errorMsg = 'error-mixed-content';
+            } else {
+                // Otherwise, display a generic fetch error.
+                errorMsg = 'error-fetch';
+            }
+
+            document.getElementById('result').innerHTML =
+                '<h2>' + gettext('error-header') + '</h2>' +
+                '<p>' + gettext(errorMsg, {
+                    'url': url
+                });
+        }
+
+        function showSavePrompt(filename, buffer) {
+            // Prompt the user to save the file.
+            var link = document.createElement('a');
+            link.download = filenameFromURL(xhr.responseURL);
+
+            link.href = 'data:Application/octet-stream;base64,' +
+                bufferToBase64(xhr.response);
+
+            // Firefox requires that the link exist on page before we can click.
+            document.body.appendChild(link);
+            link.click();
+        }
+
+        // Internationalization and Localization
+
+        var localization = {
+            "en": {
+                "title": "HashIt - Trustable Hash Calculator",
+                "description": "This tool computes SHA-256 hashes directly in your browser. Files are not sent to any server.<br>It's recommended to save this page and <a href=\"https://github.com/saheerahmedsk/SHA-256\">verify the integrity before using</a>.",
+                "local-header": "Hash a File from Your Computer",
+                "drop-area-label": "Drop file here, or click to browse",
+                "remote-header": "Hash a File from a Website",
+                "remote-label": "<a href=\"#\" class=\"tooltip\" data-tooltip=\"Websites which enable Cross Origin Resource Sharing (CORS) can be accessed by this tool. However, most websites do not enable CORS.\">Certain websites</a> may allow this tool to retrieve a file directly, without you having to save it to your computer first.",
+                "submit-btn": "Submit",
+                "save-file-btn": "Save File",
+                "result-header": "SHA-256 Hash",
+                "error-header": "Error",
+                "error-hash": "Error hashing file",
+                "error-fetch": "Error fetching {url}<br>If this URL is valid, the remote server probably does not allow cross-domain requests.",
+                "error-mixed-content": "Error fetching {url}<br>Browser blocked HTTP request because this page was loaded over HTTPS. To work around this, save this page locally, open the local copy, and retry.",
+                "footer": "Version 1.0.0<br>Free Software under VIT License<br>Read how this tool relates to trust, integrity, and authenticity at the <a href=\"https://github.com/saheerahmedsk/SHA-256\">TrustyHash homepage</a>."
+            }
+        }
+
+        // Use the language of the browser as default.
+        // For now, ignore everything after the first two characters.
+        var lang;
+        setLang(window.navigator.language.slice(0, 2));
+
+        function setLang(newLang) {
+            // Set the language for localization, falling back to 'en' if there
+            // is no localization for the language.
+            if (newLang in localization) {
+                lang = newLang;
+            } else {
+                lang = 'en';
+            }
+        }
+
+        function gettext(msgid) {
+            // Translate the msgid into a localized string and perform string substition.
+            // Format tokens for string substitution are expressed as { ... }, where the
+            // string inside the brackets is the key of the substitution string.
+            // Values are looked up from the second argument, a key/value Object.
+            var msgstr = localization[lang][msgid];
+            if (msgstr == null) {
+                throw Error("Attempted lookup on non-existent msgid: " + msgid);
+            }
+            // Perform token substitutions
+            if (arguments.length > 1) {
+                var subs = arguments[1];
+                for (var key in subs) {
+                    msgstr = msgstr.replace(RegExp('{' + key + '}'), subs[key]);
+                }
+            }
+            // Check to see that all format tokens in string have been replaced.
+            if (/{.+\}/.test(msgstr)) {
+                throw Error("Unmatched tokens when localizing " + msgid + ": " + msgstr);
+            }
+            return msgstr;
+        }
+
+        function localizeDOM() {
+            // Translate all localized elements in the DOM.
+            clearResult();
+
+            // Hide current language choice
+            var choices = document.querySelectorAll("[data-lang]");
+            for (var el of choices) {
+                el.style.display = 'inline';
+            }
+            document.querySelector("[data-lang=" + lang + "]").style.display = 'none'
+
+            var elements = document.querySelectorAll("[data-l10n-id]");
+            for (var el of elements) {
+                var msgid = el.attributes['data-l10n-id'].value;
+                if (el.nodeName == 'INPUT') {
+                    el.value = gettext(msgid);
+                } else {
+                    el.innerHTML = gettext(msgid);
+                }
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div id="lang-widget">
+        <ul>
+            <li><a data-lang="en" href="#">English</a></li>
+        </ul>
+    </div>
+    <h1 data-l10n-id="title">HashIt - Trustable Hash Calculator</h1>
+    <p data-l10n-id="description" id="description">This tool computes SHA-256 hashes directly in your browser. Files are not sent to any server.<br>It's recommended to save this page and <a href=\ "https://github.com/saheerahmedsk/SHA-256\">verify the integrity before using</a></p>
+    <noscript>
+        <h1>Please enable JavaScript. This tool uses 100% free JavaScript. View page source for license and code.</h1>
+        <h2>Version 1.0.0<br>Learn how to verify the integrity and authenticity of this tool at the <a href="https://github.com/saheerahmedsk/SHA-256">TrustyHash homepage</a>.</h2>
+        <div id="noscript-overlay"></div>
+      </noscript>
+    <h2 data-l10n-id="local-header">Hash a File from Your Computer</h2>
+    <div data-l10n-id="drop-area-label" id="drop-area">Drop file here, or click to browse</div>
+    <p><input type="file" id="fileinput" />
+        <h2 data-l10n-id="remote-header">Hash a File from a Website</h2>
+        <p data-l10n-id="remote-label"><a href="#" class="tooltip" data-tooltip="Websites which enable Cross Origin Resource Sharing (CORS) can be accessed by this tool. However, most websites do not enable CORS.">Certain websites</a> may allow this tool to retrieve a file directly,
+            without you having to save it to your computer first.
+            <form id="url-form" name="url-form">
+                <p>URL: <input id="url">
+                    <input data-l10n-id="submit-btn" type="submit" value="Submit">
+                    <input data-l10n-id="save-file-btn" id="save-file" type="button" value="Save File">
+            </form>
+            <div id="result"></div>
+            <footer data-l10n-id="footer">Version 1.0.0<br>Free Software under VIT License<br>Read how this tool relates to trust, integrity, and authenticity at the <a href="https://github.com/saheerahmedsk/SHA-256">TrustyHash homepage</a>.</footer>
+</body>
+
+</html>
